@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# Scaffold a plugin into incubator/ from templates/.
+#
+#   bin/new-plugin gpu-temp "GPU temperature, with a colour that means something"
+#   bin/new-plugin gpu-temp "..." --name "GPU Temp" --category System
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+NAMESPACE="brownfamilysports"
+
+usage() {
+  cat <<'USAGE'
+usage: bin/new-plugin <slug> "<description>" [--name "<Display Name>"]
+                                             [--kind bar-widget]
+                                             [--category <Category>]
+                                             [--author "<Name>"]
+
+  <slug>   lowercase, hyphens only. Becomes brownfamilysports.<slug>
+           and, on graduation, the repo omarchy-<slug>.
+USAGE
+  exit 64
+}
+
+[[ $# -ge 2 ]] || usage
+slug="$1"; desc="$2"; shift 2
+
+[[ "$slug" =~ ^[a-z][a-z0-9-]*$ ]] || {
+  echo "slug must be lowercase letters, digits and hyphens: got '$slug'" >&2; exit 64; }
+
+kind="bar-widget" category="System" author="Parker Brown" name=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --name)     name="${2:?}"; shift 2 ;;
+    --kind)     kind="${2:?}"; shift 2 ;;
+    --category) category="${2:?}"; shift 2 ;;
+    --author)   author="${2:?}"; shift 2 ;;
+    -h|--help)  usage ;;
+    *) echo "unknown flag: $1" >&2; usage ;;
+  esac
+done
+
+if [[ -z "$name" ]]; then
+  name="$(echo "$slug" | tr '-' ' ' | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2)}1')"
+fi
+
+tpl="$ROOT/templates/$kind"
+[[ -d "$tpl" ]] || { echo "no template for kind '$kind' (have: $(ls "$ROOT/templates" | tr '\n' ' '))" >&2; exit 1; }
+
+dest="$ROOT/incubator/$slug"
+[[ -e "$dest" ]] && { echo "$dest already exists" >&2; exit 1; }
+
+cp -r "$tpl" "$dest"
+
+id="$NAMESPACE.$slug"
+repo="https://github.com/parker-brown-family/omarchy-$slug"
+year="$(date +%Y)"
+
+# Substitute in place. Descriptions can contain punctuation, so use a delimiter
+# that will not show up in one.
+while IFS= read -r -d '' f; do
+  sed -i \
+    -e "s|__ID__|$id|g" \
+    -e "s|__NAME__|$name|g" \
+    -e "s|__DESC__|$desc|g" \
+    -e "s|__CATEGORY__|$category|g" \
+    -e "s|__AUTHOR__|$author|g" \
+    -e "s|__YEAR__|$year|g" \
+    -e "s|__REPO__|$repo|g" \
+    "$f"
+done < <(find "$dest" -type f -print0)
+
+cat <<EOF
+
+  Scaffolded $id  ->  incubator/$slug
+
+  1. bin/dev-link $slug        symlink it into ~/.config/omarchy/plugins and rescan
+  2. edit incubator/$slug/BarWidget.qml   (saves hot-reload; no restart)
+  3. bin/verify $slug          the taste + validity gate
+  4. run it daily for a week   see docs/triage.md — this step is not optional
+  5. bin/graduate $slug        own repo, tag, marketplace listing
+
+  Learn the surface by reading a real one:  omarchy plugin clone omarchy.clock --edit
+EOF

@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+# The gate. Structural validity + the mechanical half of TASTE.md.
+#
+#   bin/verify gpu-temp      one incubator plugin
+#   bin/verify               all of them
+#
+# Exit 0 only when there are no errors AND no warnings. A warning you decided to
+# accept gets a `# taste-ok: <reason>` comment on the offending line.
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+NAMESPACE="brownfamilysports"
+
+errors=0 warns=0
+err()  { printf '  \033[31m✗\033[0m %s\n' "$*"; errors=$((errors+1)); }
+warn() { printf '  \033[33m!\033[0m %s\n' "$*"; warns=$((warns+1)); }
+ok()   { printf '  \033[32m✓\033[0m %s\n' "$*"; }
+
+need() { command -v "$1" >/dev/null 2>&1; }
+
+check_plugin() {
+  local dir="$1" mf="$1/manifest.json"
+  printf '\n\033[1m%s\033[0m\n' "${dir#"$ROOT/"}"
+
+  [[ -f "$mf" ]] || { err "no manifest.json at the plugin root"; return; }
+
+  if ! jq empty "$mf" 2>/dev/null; then err "manifest.json is not valid JSON"; return; fi
+  ok "manifest parses"
+
+  local id kinds
+  id="$(jq -r '.id // ""' "$mf")"
+
+  for field in schemaVersion id name version kinds entryPoints; do
+    [[ "$(jq -r "has(\"$field\")" "$mf")" == "true" ]] || err "manifest is missing required field: $field"
+  done
+  # Wanted by the marketplace listing, not by the shell validator.
+  for field in author description license; do
+    [[ "$(jq -r "has(\"$field\")" "$mf")" == "true" ]] || warn "manifest has no \`$field\` — the marketplace listing wants it"
+  done
+
+  case "$id" in
+    omarchy.*) err "id '$id' uses the reserved omarchy.* namespace" ;;
+    "$NAMESPACE".*) ok "id $id" ;;
+    *) warn "id '$id' is outside our $NAMESPACE.* namespace — deliberate?" ;;
+  esac
+
+  jq -e '.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+")' "$mf" >/dev/null 2>&1 \
+    || warn "version is not semver"
+
+  # Every declared kind needs its entry point, and every entry point file must
+  # actually be there. This mirrors what `omarchy plugin validate` enforces.
+  kinds="$(jq -r '.kinds // [] | .[]' "$mf")"
+  local missing=0
+  for k in $kinds; do
+    local key
+    case "$k" in
+      bar-widget) key="barWidget" ;;
+      panel|overlay|menu|service|bar) key="$k" ;;
+      *) err "unknown kind: $k"; continue ;;
+    esac
+    local f; f="$(jq -r --arg k "$key" '.entryPoints[$k] // ""' "$mf")"
+    if [[ -z "$f" ]]; then
+      err "kind '$k' declares no entryPoints.$key"; missing=1
+    elif [[ "$f" = /* || "$f" == *..* ]]; then
+      err "entryPoints.$key '$f' is not a safe relative path"; missing=1
+    elif [[ ! -f "$dir/$f" ]]; then
+      err "entryPoints.$key points at $f, which does not exist"; missing=1
+    fi
+  done
+  [[ $missing -eq 0 && -n "$kinds" ]] && ok "kinds ↔ entryPoints line up"
+
+  # The validator rejects symlinks inside a plugin folder outright.
+  if find "$dir" -type l -not -path '*/.git/*' | grep -q .; then
+    err "symlinks inside the plugin folder — the validator refuses these"
+  fi
+
+  # TASTE.md rule 3. A hex literal means the plugin ignores the user's theme.
+  local hits
+  hits="$(grep -rnE '#[0-9a-fA-F]{3,8}\b' --include='*.qml' --include='*.js' "$dir" 2>/dev/null \
+          | grep -v 'taste-ok' || true)"
+  if [[ -n "$hits" ]]; then
+    warn "hardcoded colours — pull them off the theme (TASTE.md rule 3):"
+    printf '      %s\n' "$hits"
+  else
+    ok "no hardcoded colours"
+  fi
+
+  # TASTE.md rule 6.
+  if grep -rniE 'quickshell|\bqs\b[^.]' --include='*.qml' "$dir" 2>/dev/null \
+     | grep -iE 'Process|execDetached' | grep -qi 'quickshell'; then
+    warn "looks like it may launch Quickshell — never start a second shell process"
+  fi
+
+  # TASTE.md rule 5.
+  if [[ -f "$dir/BarWidget.qml" ]] && ! grep -q 'vertical' "$dir/BarWidget.qml"; then
+    warn "BarWidget.qml never mentions \`vertical\` — will it look right in a side bar?"
+  fi
+
+  # TASTE.md rule 7.
+  if [[ -f "$dir/BarWidget.qml" ]] && ! grep -q 'IpcHandler' "$dir/BarWidget.qml"; then
+    warn "no IpcHandler — the widget is unreachable from a keybind"
+  fi
+
+  # Scaffolding left in place.
+  if grep -rq '__[A-Z_]*__' "$dir" 2>/dev/null; then
+    err "unsubstituted template placeholders remain"
+  fi
+
+  for f in README.md LICENSE; do
+    [[ -f "$dir/$f" ]] || warn "no $f"
+  done
+  [[ -f "$dir/preview.png" ]] || warn "no preview.png — the marketplace listing is a text row without it"
+
+  if [[ -f "$dir/README.md" ]] && ! grep -qi 'network' "$dir/README.md"; then
+    warn "README does not disclose network behaviour (TASTE.md rule 10)"
+  fi
+
+  # QML syntax. Needs the shell on the include path to resolve qs.Ui / qs.Commons.
+  if need qmllint; then
+    if [[ -n "${OMARCHY_PATH:-}" && -d "${OMARCHY_PATH}/shell" ]]; then
+      local out
+      out="$(find "$dir" -name '*.qml' -print0 | xargs -0 -r qmllint -I "$OMARCHY_PATH/shell" 2>&1)"
+      if [[ -n "$out" ]]; then err "qmllint:"; printf '      %s\n' "$out"; else ok "qmllint clean"; fi
+    else
+      warn "OMARCHY_PATH unset — skipping qmllint (run this on the Omarchy box)"
+    fi
+  else
+    warn "qmllint not installed — skipping QML syntax check"
+  fi
+
+  if need omarchy; then
+    if omarchy plugin validate "$dir" >/dev/null 2>&1; then
+      ok "omarchy plugin validate"
+    else
+      err "omarchy plugin validate failed:"
+      omarchy plugin validate "$dir" 2>&1 | sed 's/^/      /'
+    fi
+  else
+    warn "omarchy not on PATH — skipping the real validator (run this on the Omarchy box)"
+  fi
+}
+
+need jq || { echo "jq is required" >&2; exit 1; }
+
+if [[ $# -gt 0 ]]; then
+  for p in "$@"; do check_plugin "$ROOT/incubator/${p#incubator/}"; done
+else
+  shopt -s nullglob
+  for d in "$ROOT"/incubator/*/; do check_plugin "${d%/}"; done
+fi
+
+printf '\n%s\n' "$(printf '─%.0s' {1..60})"
+if [[ $errors -gt 0 ]]; then
+  printf '\033[31m%d error(s), %d warning(s) — not shippable\033[0m\n' "$errors" "$warns"; exit 1
+elif [[ $warns -gt 0 ]]; then
+  printf '\033[33m%d warning(s) — fix them or annotate with `# taste-ok: <reason>`\033[0m\n' "$warns"; exit 1
+else
+  printf '\033[32mclean\033[0m\n'
+fi

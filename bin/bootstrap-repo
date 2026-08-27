@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# One-time: create the public lab repo and its label taxonomy.
+# Safe to re-run — every step is idempotent.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+OWNER="parker-brown-family"
+REPO="omarchy-lab"
+
+cd "$ROOT"
+
+if ! gh repo view "$OWNER/$REPO" >/dev/null 2>&1; then
+  gh repo create "$OWNER/$REPO" \
+    --public \
+    --source=. \
+    --remote=origin \
+    --description "Omarchy plugin workshop — backlog, taste gate, and plugins on their way to their own repos." \
+    --disable-wiki
+  echo "created $OWNER/$REPO"
+else
+  git remote get-url origin >/dev/null 2>&1 || \
+    git remote add origin "https://github.com/$OWNER/$REPO.git"
+  echo "$OWNER/$REPO already exists"
+fi
+
+label() {
+  gh label create "$1" --color "$2" --description "$3" --force >/dev/null
+  printf '  %s\n' "$1"
+}
+
+echo "labels:"
+label "stage:idea"        "d4c5f9" "Captured, not yet triaged"
+label "stage:incubating"  "5319e7" "Being built in incubator/"
+label "stage:polish"      "0e8a16" "Working; running the TASTE.md ship checklist"
+label "stage:published"   "0b5394" "Own repo, tagged, listed"
+
+label "lane:now"          "b60205" "Build next — lane is capped at 2"
+label "lane:next"         "fbca04" "Real, not now"
+label "lane:someday"      "c2e0c6" "Parked without guilt"
+
+label "kind:bar-widget"   "1d76db" "manifest kind: bar-widget"
+label "kind:panel"        "1d76db" "manifest kind: panel"
+label "kind:overlay"      "1d76db" "manifest kind: overlay"
+label "kind:menu"         "1d76db" "manifest kind: menu"
+label "kind:service"      "1d76db" "manifest kind: service"
+label "kind:bar"          "1d76db" "manifest kind: bar"
+
+label "taste:risk"        "e99695" "Flagged against a TASTE.md rule; blocks graduation"
+label "follow-up"         "bfd4f2" "Deferred work; feeds the cross-repo follow-up rollup"
+label "upstream"          "006b75" "Belongs in basecamp/omarchy — a PR, not a plugin"
+
+for stale in enhancement documentation duplicate "good first issue" "help wanted" question invalid; do
+  gh label delete "$stale" --yes >/dev/null 2>&1 || true
+done
+
+echo
+echo "  done. Now: bin/triage"

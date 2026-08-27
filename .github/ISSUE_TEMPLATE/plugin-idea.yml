@@ -1,0 +1,55 @@
+name: Plugin idea
+description: Something Omarchy should be able to do and can't
+labels: ["stage:idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Fill in what you know. An idea with one sentence beats an idea you didn't
+        write down — triage fills in the rest. `bin/idea "<title>"` is the faster path.
+
+  - type: textarea
+    id: annoyance
+    attributes:
+      label: What's annoying right now
+      description: The concrete moment where this bites. Not the feature — the friction.
+      placeholder: I alt-tab to a terminal to check GPU temp while rendering, three or four times an hour.
+    validations:
+      required: true
+
+  - type: textarea
+    id: behaviour
+    attributes:
+      label: What it does
+      description: One or two sentences. If you need a bulleted list, it's probably two plugins.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - not sure yet
+        - bar-widget
+        - panel
+        - overlay
+        - menu
+        - service
+        - bar
+
+  - type: input
+    id: prior
+    attributes:
+      label: Does Omarchy already ship this?
+      description: >
+        Check the first-party coverage list in docs/platform.md. Duplicating a built-in
+        is an automatic close, and it's a two-minute check.
+      placeholder: "No — nearest is omarchy.monitor, which is CPU/RAM only"
+
+  - type: textarea
+    id: default
+    attributes:
+      label: What's the right default?
+      description: >
+        TASTE.md rule 2 — it ships zero-config or it doesn't ship. If you can't name a
+        default that's right for most people, say so; that's useful information about
+        whether this is ready.

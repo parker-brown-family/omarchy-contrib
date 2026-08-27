@@ -1,0 +1,57 @@
+name: Follow-up
+description: Something noticed and not fixed. Must be falsifiable.
+labels: ["follow-up"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The person who picks this up starts by trying to **disprove** it against the code
+        as it is that day, and only fixes what survives. Changing a non-problem is worse
+        than leaving it alone, so give them what they need to make that call.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What, and where — `file:line`, the surface, or the commit that introduced it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proof
+    attributes:
+      label: Proof it's real today
+      description: >
+        Log output, a failing check, a screenshot, the wrong artifact itself. If you only
+        have a suspicion, write "hunch" — an honest hunch is worth filing, a hunch
+        dressed as evidence is not.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduce
+      description: Exact commands or steps.
+    validations:
+      required: true
+
+  - type: textarea
+    id: falsify
+    attributes:
+      label: Verify / invalidate
+      description: >
+        The check that confirms it — and the condition under which it is **not** real and
+        this gets closed `invalid`. Run this first, before touching anything.
+      placeholder: |
+        Confirm: `bin/verify gpu-temp` reports the hardcoded colour.
+        Invalidate: if the theme singleton now exposes a matching token, the literal was
+        already replaced upstream — close invalid.
+    validations:
+      required: true
+
+  - type: input
+    id: done
+    attributes:
+      label: Done when
+      description: Acceptance, ideally a check that flips.

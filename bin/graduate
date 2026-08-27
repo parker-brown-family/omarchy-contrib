@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# Promote an incubator plugin to its own public repo, with its history intact.
+#
+# Distribution is one plugin per repo with manifest.json at the root — there is
+# no subdirectory support in `omarchy plugin add`. So graduation is a real move,
+# not a copy.
+#
+#   bin/graduate gpu-temp
+#   bin/graduate gpu-temp --dry-run
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+OWNER="parker-brown-family"
+
+slug="${1:?usage: bin/graduate <slug> [--dry-run]}"
+dry="${2:-}"
+src="$ROOT/incubator/$slug"
+repo="omarchy-$slug"
+
+[[ -d "$src" ]] || { echo "no such plugin: incubator/$slug" >&2; exit 1; }
+
+echo "── gate ────────────────────────────────────────────────"
+"$ROOT/bin/verify" "$slug" || {
+  echo
+  echo "verify is not clean. Nothing ships from here until it is." >&2
+  exit 1
+}
+
+id="$(jq -r .id "$src/manifest.json")"
+version="$(jq -r .version "$src/manifest.json")"
+desc="$(jq -r .description "$src/manifest.json")"
+
+echo
+echo "  $id  v$version"
+echo "  -> https://github.com/$OWNER/$repo"
+echo
+
+cat <<'CHECK'
+  Hand checks that no script can do for you (TASTE.md ship checklist):
+    - horizontal bar AND vertical bar
+    - a light theme AND a dark one, switched live
+    - disable / re-enable / restart the shell / remove — no orphan state
+    - idles at ~0% CPU:  top -p $(pgrep -f omarchy-shell)
+    - a week of daily use behind you
+
+CHECK
+read -r -p "  All of that done? [y/N] " answer
+[[ "$answer" == [yY] ]] || { echo "  stopping."; exit 1; }
+
+[[ "$dry" == "--dry-run" ]] && { echo "  dry run — stopping before any push."; exit 0; }
+
+cd "$ROOT"
+[[ -z "$(git status --porcelain)" ]] || { echo "working tree is dirty — commit first" >&2; exit 1; }
+
+# subtree split rewrites the path's history so manifest.json lands at the root
+# of the new repo while the commits that got it there come along.
+branch="graduate/$slug"
+git branch -D "$branch" 2>/dev/null || true
+git subtree split --prefix="incubator/$slug" -b "$branch"
+
+gh repo create "$OWNER/$repo" \
+  --public \
+  --description "$desc" \
+  --disable-wiki 2>/dev/null || echo "  (repo already exists — pushing into it)"
+
+git push "https://github.com/$OWNER/$repo.git" "$branch:main"
+
+tmp="$(mktemp -d)"
+git clone "https://github.com/$OWNER/$repo.git" "$tmp/$repo" --quiet
+git -C "$tmp/$repo" tag -a "v$version" -m "$id v$version"
+git -C "$tmp/$repo" push origin "v$version"
+gh release create "v$version" --repo "$OWNER/$repo" --title "v$version" --generate-notes
+rm -rf "$tmp"
+
+cat <<EOF
+
+  Published: https://github.com/$OWNER/$repo  (tagged v$version)
+
+  Install line for the README and the announcement:
+    omarchy plugin add https://github.com/$OWNER/$repo.git --enable
+
+  Next:
+    1. Submit to the marketplace:
+       https://github.com/HANCORE-linux/omarchy-plugin-marketplace/issues/new?template=submit-plugin.yml
+    2. Retire it from the incubator once the listing is live:
+         git rm -r incubator/$slug && git commit -m "Graduate $id to its own repo"
+    3. Move the tracking issue to stage:published and close it.
+EOF

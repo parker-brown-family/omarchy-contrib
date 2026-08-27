@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# The weekly rite. Shows what's untriaged, what's in flight, and whether the
+# now-lane is over its WIP limit.  See docs/triage.md for the scoring.
+set -euo pipefail
+
+WIP_LIMIT=2
+
+hr() { printf '\n\033[1m%s\033[0m\n' "$1"; }
+
+hr "Untriaged — score these (Pain + Fit + Taste − Cost)"
+gh issue list --label stage:idea --state open \
+  --json number,title,labels \
+  --template '{{range .}}  #{{.number}}  {{.title}}{{"\n"}}{{end}}{{if not .}}  (nothing waiting — good){{"\n"}}{{end}}'
+
+hr "lane:now — build these, cap is '"$WIP_LIMIT"'"
+now=$(gh issue list --label lane:now --state open --json number,title \
+  --template '{{range .}}  #{{.number}}  {{.title}}{{"\n"}}{{end}}')
+printf '%s' "${now:-  (empty — pull something up from lane:next)
+}"
+count=$(printf '%s' "$now" | grep -c '^  #' || true)
+if [[ "$count" -gt "$WIP_LIMIT" ]]; then
+  printf '\033[33m  ⚠ %d in flight, limit is %d. Finish one before starting another.\033[0m\n' \
+    "$count" "$WIP_LIMIT"
+fi
+
+hr "In the incubator"
+gh issue list --label stage:incubating --state open \
+  --json number,title --template '{{range .}}  #{{.number}}  {{.title}}{{"\n"}}{{end}}'
+
+hr "Polishing — run the TASTE.md ship checklist"
+gh issue list --label stage:polish --state open \
+  --json number,title --template '{{range .}}  #{{.number}}  {{.title}}{{"\n"}}{{end}}'
+
+hr "Upstream — these are PRs to basecamp/omarchy, not plugins"
+gh issue list --label upstream --state open \
+  --json number,title --template '{{range .}}  #{{.number}}  {{.title}}{{"\n"}}{{end}}'
+
+hr "Taste risks blocking a graduation"
+gh issue list --label taste:risk --state open \
+  --json number,title --template '{{range .}}  #{{.number}}  {{.title}}{{"\n"}}{{end}}'
+
+hr "Next"
+cat <<'EOF'
+  Score an idea:   gh issue comment <n> --body "Pain 3 / Fit 3 / Taste 2 / Cost 1 = 7"
+  Give it a lane:  gh issue edit <n> --add-label lane:now --remove-label stage:idea \
+                     --add-label stage:incubating
+  Kill it:         gh issue close <n> --reason "not planned" --comment "<one line why>"
+EOF

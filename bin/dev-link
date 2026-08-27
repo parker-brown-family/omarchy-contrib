@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Point ~/.config/omarchy/plugins/<id> at an incubator plugin so the shell picks
+# up your edits live. The plugin *directory* may be a symlink; symlinks *inside*
+# a plugin are what the validator rejects.
+#
+#   bin/dev-link gpu-temp
+#   bin/dev-link gpu-temp --off
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PLUGDIR="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins"
+
+slug="${1:?usage: bin/dev-link <slug> [--off]}"
+src="$ROOT/incubator/$slug"
+[[ -d "$src" ]] || { echo "no such plugin: incubator/$slug" >&2; exit 1; }
+
+id="$(jq -r .id "$src/manifest.json")"
+dest="$PLUGDIR/$id"
+
+if [[ "${2:-}" == "--off" ]]; then
+  [[ -L "$dest" ]] || { echo "$dest is not a symlink — refusing to touch it" >&2; exit 1; }
+  rm "$dest"
+  echo "unlinked $id"
+else
+  mkdir -p "$PLUGDIR"
+  if [[ -e "$dest" && ! -L "$dest" ]]; then
+    echo "$dest exists and is a real directory — move it aside first" >&2; exit 1
+  fi
+  ln -sfn "$src" "$dest"
+  echo "linked $id -> incubator/$slug"
+fi
+
+if command -v omarchy-shell >/dev/null 2>&1; then
+  omarchy-shell shell rescanPlugins
+  echo "rescanned"
+else
+  echo "omarchy-shell not on PATH — rescan by hand: omarchy-shell shell rescanPlugins"
+fi
+
+echo
+echo "  enable it:   omarchy plugin enable $id"
+echo "  watch it:    edits under incubator/$slug hot-reload, no restart needed"

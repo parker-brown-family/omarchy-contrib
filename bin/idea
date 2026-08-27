@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Capture a plugin idea as a GitHub issue. Five seconds, no thinking.
+#
+#   bin/idea "gpu temp in the bar, colour-shifts when it's cooking"
+#   bin/idea "pomodoro widget" --kind bar-widget
+#   bin/idea "clipboard search is slow" --upstream
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+usage: bin/idea "<title>" [--kind <kind>] [--upstream] [--body <text>]
+
+  --kind      bar-widget | panel | overlay | menu | service | bar
+  --upstream  this belongs in basecamp/omarchy, not here (a PR, not a plugin)
+  --body      extra context; otherwise you get a stub to fill in later
+USAGE
+  exit 64
+}
+
+[[ $# -ge 1 ]] || usage
+title="$1"; shift
+[[ "$title" == --* ]] && usage
+
+kind="" body="" labels="stage:idea"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --kind)     kind="${2:?--kind needs a value}"; shift 2 ;;
+    --body)     body="${2:?--body needs a value}"; shift 2 ;;
+    --upstream) labels="$labels,upstream"; shift ;;
+    -h|--help)  usage ;;
+    *)          echo "unknown flag: $1" >&2; usage ;;
+  esac
+done
+
+case "$kind" in
+  "") ;;
+  bar-widget|panel|overlay|menu|service|bar) labels="$labels,kind:$kind" ;;
+  *) echo "unknown kind: $kind" >&2; usage ;;
+esac
+
+: "${body:=_Captured on the fly. Triage will fill this in._}"
+
+gh issue create \
+  --title "$title" \
+  --label "$labels" \
+  --body "$body
+
+---
+<sub>Filed by \`bin/idea\`. Scored at the next triage — see \`docs/triage.md\`.</sub>"
