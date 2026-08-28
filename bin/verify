@@ -115,11 +115,18 @@ check_plugin() {
     warn "README does not disclose network behaviour (TASTE.md rule 10)"
   fi
 
-  # QML syntax. Needs the shell on the include path to resolve qs.Ui / qs.Commons.
+  # QML syntax. Quickshell's `qs.*` import prefix aliases the shell ROOT, so a
+  # bare `-I $OMARCHY_PATH/shell` can never resolve `qs.Commons` — qmllint wants
+  # the module URI's dots mirrored in the path (qs/Commons). A throwaway import
+  # root holding one `qs` symlink gives the linter the exact view the runtime
+  # has, and turns a wall of import noise into a real syntax gate.
   if need qmllint; then
     if [[ -n "${OMARCHY_PATH:-}" && -d "${OMARCHY_PATH}/shell" ]]; then
-      local out
-      out="$(find "$dir" -name '*.qml' -print0 | xargs -0 -r qmllint -I "$OMARCHY_PATH/shell" 2>&1)"
+      local out qsroot
+      qsroot="$(mktemp -d)"
+      ln -s "$OMARCHY_PATH/shell" "$qsroot/qs"
+      out="$(find "$dir" -name '*.qml' -print0 | xargs -0 -r qmllint -I "$qsroot" -I /usr/lib/qt6/qml 2>&1)"
+      rm -rf "$qsroot"
       if [[ -n "$out" ]]; then err "qmllint:"; printf '      %s\n' "$out"; else ok "qmllint clean"; fi
     else
       warn "OMARCHY_PATH unset — skipping qmllint (run this on the Omarchy box)"

@@ -172,6 +172,23 @@ terminal to get the widget.
 Score it through `docs/triage.md` like anything else. It does not get a pass for being
 ours.
 
+## Shipped from this gap: `brownfamilysports.td-palette` (2026-08-28)
+
+The first plugin out of that gap is not the sessions widget — it is the painter.
+terminal-delight grew a control socket (`$XDG_RUNTIME_DIR/terminal-delight/ctl-<pid>.sock`,
+branch `feat/td-paint-mode`) and a PAINT mode: every pane overlays a glyph grid of the
+theme tray's colour sets (🦇 ☢ 🤡 🌊 …); clicking a glyph recolours **that pane only**,
+CRT identity untouched, persisted in the terminal's own per-pane state. The
+`incubator/td-palette` bar widget is the doorbell: 🎨 in the tray, left-click paints the
+active workspace's terminals (`terminal-delight ctl paint toggle`), middle paints
+everywhere, right lowers every brush, and an `IpcHandler` gives keybinds the same verbs.
+
+The division of labour is the Wayland-honest one from the top of this file: the shell
+cannot paint into the terminal's surface, so the shell owns the *button* and the terminal
+owns the *overlay*. The ctl client resolves "active workspace" against the Hyprland IPC
+socket by window class + pid, which is also why the widget itself never needs to talk to
+Hyprland at all.
+
 ## Sources
 
 - `basecamp/omarchy@quattro:docs/theming.md`
