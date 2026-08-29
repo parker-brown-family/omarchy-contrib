@@ -12,7 +12,7 @@ before that.
 
 | Plugin | id | What it does |
 |---|---|---|
-| _none yet_ | | |
+| [Terminal Paint](https://github.com/parker-brown-family/omarchy-td-palette) | `brownfamilysports.td-palette` | Per-tile terminal painting from the bar — Terminal Delight variants, saturate, fully keyboard-playable |
 
 ## In the incubator
 
