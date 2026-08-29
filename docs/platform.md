@@ -178,8 +178,12 @@ validation runs against the current commit, then a maintainer approves.
 The marketplace validates listings, not security. Our README carries the disclosure —
 see rule 10 in `TASTE.md`.
 
-**As of 2026-08-27 the registry lists zero community plugins.** Treat that as a fact with
-a short shelf life; re-check before leaning on it.
+**As of 2026-08-29 the registry lists 500+ community plugins** — it was zero on
+2026-08-27, which is the best proof this file will ever offer for its own
+re-verification rule. Omarchy ran its first plugin competition in August 2026
+($2.5k/$1k/$500, judged by the Omarchy Core team; listed plugins were
+automatically eligible). The distribution playbook for our plugins lives in
+`omarchy-terminal-delight-theme/docs/DISTRIBUTION.md`.
 
 ## Re-verifying this file
 
