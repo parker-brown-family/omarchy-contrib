@@ -140,6 +140,20 @@ the bar can swap one popout for another cleanly.
 Don't hand-roll a panel. Run `omarchy plugin clone omarchy.clock --edit` and lift
 `Panel.qml` — it's the sanctioned way to learn the surface, and it's already correct.
 
+## Verified gotchas
+
+**One QML file per third-party plugin (verified 2026-08-29 on this box).** A
+third-party plugin's panel/overlay/menu entry point — or any second `.qml`
+loaded from its directory — fails to load with a QML `File name case mismatch`
+error, even for a minimal `Item {}`. Reproduced through the dev-link symlink,
+through a real directory copy, and under a different file name; the bar-widget
+entry loads fine through `BarWidgetRegistry` the whole time. Compounding it,
+the shell's panel-loader error path crashes on a bare `errorString`
+(`shell.qml` ~645, `ReferenceError`), so the real load error never reaches the
+log. Until both are fixed upstream: ship third-party plugins as a SINGLE
+`BarWidget.qml` and let it own its `PanelWindow` overlay directly — which also
+turns summon routing into plain function calls. Tracked in this repo's issues.
+
 ## First-party coverage (don't rebuild these)
 
 `bar` `image-picker` `emojis` `clipboard` `reminders` `menu` `notifications` `audio`

@@ -85,10 +85,13 @@ check_plugin() {
     ok "no hardcoded colours"
   fi
 
-  # TASTE.md rule 6.
-  if grep -rniE 'quickshell|\bqs\b[^.]' --include='*.qml' "$dir" 2>/dev/null \
-     | grep -iE 'Process|execDetached' | grep -qi 'quickshell'; then
-    warn "looks like it may launch Quickshell — never start a second shell process"
+  # TASTE.md rule 6. The sanctioned APIs live under the `Quickshell` namespace
+  # (Quickshell.execDetached, Quickshell.Io.Process), so the namespace proves
+  # nothing — what would prove a second shell is the word quickshell inside a
+  # STRING LITERAL, i.e. a command line about to be executed.
+  if grep -rniE '"[^"]*quickshell[^"]*"' --include='*.qml' --include='*.js' "$dir" 2>/dev/null \
+     | grep -v 'taste-ok' | grep -q .; then
+    warn "a string literal names quickshell — never start a second shell process"
   fi
 
   # TASTE.md rule 5.
