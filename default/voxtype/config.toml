@@ -46,6 +46,12 @@ pause_media = true
 # Or provide absolute path to a custom .bin model file
 model = "base.en"
 
+# Text the decoder is conditioned on, as though it were the previous segment.
+# Naming "Omarchy" here makes the correct spelling reachable while decoding,
+# which is cheaper and less brittle than only repairing it afterwards — see the
+# [text] replacements at the bottom of this file, which catch what slips past.
+initial_prompt = "Omarchy, the Arch Linux and Hyprland desktop, pronounced oh-MAH-chee."
+
 # Language for transcription
 # Use "en" for English, "auto" for auto-detection
 # See: https://github.com/openai/whisper#available-models-and-languages
@@ -90,11 +96,23 @@ on_recording_stop = false
 # Show notification with transcribed text after transcription completes
 on_transcription = false
 
-# [text]
+[text]
 # Text processing options (word replacements, spoken punctuation)
 #
 # Enable spoken punctuation conversion (e.g., say "period" to get ".")
 # spoken_punctuation = false
 #
-# Custom word replacements (case-insensitive)
+# Custom word replacements (case-insensitive). Add your own here:
 # replacements = { "hyperwhisper" = "hyprwhspr" }
+#
+# "Omarchy" is pronounced oh-MAH-chee, and it is a word no speech model has
+# been trained on, so it is transcribed as whichever real words fit those
+# sounds. Every spelling below has been observed or is a near neighbour of one;
+# they all resolve to the name of the OS the user is dictating into.
+#
+# Matching is a case-insensitive SUBSTRING match over the whole transcript, so
+# each key has to be unambiguous on its own. Two consequences worth keeping in
+# mind before extending this list: a bare "omach" or "omarch" key is a prefix
+# of "Omarchy" itself and would rewrite correct transcripts into "Omarchyy",
+# and keys beginning "omar " collide with the given name Omar.
+replacements = { "omachi" = "Omarchy", "omachee" = "Omarchy", "omachy" = "Omarchy", "oh machi" = "Omarchy", "oh mah chee" = "Omarchy", "oma chee" = "Omarchy", "o'machi" = "Omarchy", "amachi" = "Omarchy", "umachi" = "Omarchy", "omarchi" = "Omarchy", "omarchee" = "Omarchy", "omaki" = "Omarchy", "omarky" = "Omarchy", "omarkey" = "Omarchy" }
