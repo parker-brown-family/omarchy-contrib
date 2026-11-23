@@ -1151,6 +1151,7 @@ Panel {
 
   BarIconButton {
     id: button
+    accessibleName: I18n.t("accessibility.network")
     anchors.fill: parent
     bar: root.bar
     text: root.icon
@@ -1176,6 +1177,7 @@ Panel {
   // here is the wifi-specific UI inside.
   KeyboardPanel {
     id: panel
+    accessibleName: I18n.t("accessibility.network")
     anchorItem: button
     owner: root
     bar: root.bar
@@ -1355,6 +1357,7 @@ Panel {
 
           ToggleSwitch {
             id: powerSwitch
+            accessibleName: I18n.t("accessibility.wifi")
             visible: root.canToggleWifi
             checked: Networking.wifiEnabled
             hasCursor: root.toggleHeaderHasCursor
@@ -1561,6 +1564,7 @@ Panel {
             // plain verticalCenter would sit the switch visibly high.
             ToggleSwitch {
               id: bandAutoSwitch
+              accessibleName: I18n.t("accessibility.automaticBand")
               trackHeight: Math.round(bandAutoLabel.font.pixelSize * 1.2)
               cursorPad: Style.space(3)
               anchors.verticalCenter: bandAutoLabel.verticalCenter
@@ -1778,8 +1782,10 @@ Panel {
     verticalPadding: Style.spacing.controlPaddingY + Style.space(2)
     bordered: true
 
+    selectable: true
     active: root.bandCurrent === band
     selected: root.bandEffective === band
+    Accessible.selected: selected
     hasCursor: root.cursorActive && root.focusSection === "band"
       && !root.bandAutoFocused && root.bandIndex === slot
 
@@ -1808,6 +1814,7 @@ Panel {
     horizontalPadding: Style.spacing.controlPaddingX
     verticalPadding: Style.spacing.controlPaddingY + Style.space(2)
     bordered: true
+    selectable: true
 
     // Map the panel's domain semantics onto Button's structural props:
     // `current DNS` is the pill's `active` fill; the keyboard cursor lights
@@ -1843,6 +1850,8 @@ Panel {
     readonly property bool forgetFocused: isSelected && root.wifiActionFocused && canForget
     readonly property bool forgetVisible: canForget && (!requiresCredentials || forgetFocused || rightMouse.containsMouse)
 
+    accessibleName: net ? (net.ssid || I18n.t("network.hidden")) : ""
+    Accessible.onPressAction: row.activate()
     hasCursor: root.cursorActive && isSelected && !root.wifiActionFocused
     current: isConnected
     foreground: root.bar.foreground
@@ -1853,6 +1862,21 @@ Panel {
     readonly property bool isBusy: root.actionKind !== "" && root.actionSsid === (net ? net.ssid : "")
     readonly property bool isFailed: root.failureReason !== "" && root.failureSsid === (net ? net.ssid : "")
     readonly property bool isPasswordOpen: root.passwordSsid !== "" && root.passwordSsid === (net ? net.ssid : "")
+
+    function activate() {
+      if (!net || root.busy) return
+      root.cursorActive = true
+      root.focusSection = "wifi"
+      root.selectedIndex = row.index
+      root.wifiActionFocused = false
+      if (row.isConnected) {
+        root.disconnectRow(row.net.ssid)
+      } else if (row.requiresCredentials && !row.isKnown) {
+        root.openPasswordPrompt(row.net.ssid)
+      } else {
+        root.connectDirectly(row.net.ssid)
+      }
+    }
 
     function submitCredentials() {
       if (!net || root.busy || root.passwordText.length === 0) return
@@ -1917,24 +1941,7 @@ Panel {
       // subsequent j/k pick up from this row).
       onContainsMouseChanged: if (containsMouse) { root.cursorActive = true; root.focusSection = "wifi"; root.selectedIndex = row.index; root.wifiActionFocused = false }
 
-      onClicked: {
-        if (!row.net) return
-        // Resync cursor in case keyboard nav moved it away while the mouse
-        // stayed parked on this row — the click target is unambiguously here.
-        root.cursorActive = true
-        root.focusSection = "wifi"
-        root.selectedIndex = row.index
-        root.wifiActionFocused = false
-        if (row.isConnected) {
-          root.disconnectRow(row.net.ssid)
-          return
-        }
-        if (row.requiresCredentials && !row.isKnown) {
-          root.openPasswordPrompt(row.net.ssid)
-          return
-        }
-        root.connectDirectly(row.net.ssid)
-      }
+      onClicked: row.activate()
     }
 
     Item {
@@ -2091,6 +2098,7 @@ Panel {
         anchors.top: parent.top
         anchors.rightMargin: Style.space(6)
         placeholderText: Commons.I18n.t("network.identity")
+        accessibleName: Commons.I18n.t("network.identity")
         font.family: Style.font.family
         font.pixelSize: Style.font.body
         foreground: root.bar.foreground
@@ -2118,6 +2126,7 @@ Panel {
         password: true
         revealed: passwordPanel.revealed
         placeholderText: Commons.I18n.t("network.passphrase")
+        accessibleName: Commons.I18n.t("network.passphrase")
         font.family: Style.font.family
         font.pixelSize: Style.font.body
         foreground: root.bar.foreground
